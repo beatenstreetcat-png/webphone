@@ -1,0 +1,138 @@
+<!doctype html>
+<html lang="ru">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<meta name="theme-color" content="#10131c">
+<title>WebPhone OS 0.2</title>
+<style>
+:root{--panel:#1c2230;--text:#f5f7ff;--muted:#aab3c5;--accent:#7c9cff;--line:#30394c}
+*{box-sizing:border-box}body{margin:0;background:#090c13;color:var(--text);font:15px system-ui,-apple-system,Segoe UI,sans-serif;min-height:100vh;display:grid;place-items:center}
+.phone{width:min(100vw,420px);height:min(920px,100dvh);min-height:620px;background:linear-gradient(160deg,#202b45,#101522 55%,#18243a);position:relative;overflow:hidden;border:1px solid #39445a;border-radius:28px;box-shadow:0 24px 80px #0009}
+.status{height:38px;padding:10px 22px 0;display:flex;justify-content:space-between;font-size:12px;color:#e8edff}
+main{height:calc(100% - 82px);overflow:auto;padding:16px 18px 24px}
+.clock{font-size:54px;font-weight:300;letter-spacing:-3px;margin:26px 0 0}.date{color:#d0d9ec;margin-bottom:26px}
+.search{width:100%;border:1px solid #ffffff26;background:#ffffff16;color:white;border-radius:16px;padding:13px 15px;font:inherit;outline:none}.search::placeholder{color:#c2ccdf}
+.grid{display:grid;grid-template-columns:repeat(4,1fr);gap:22px 10px;margin-top:30px}
+.app{border:0;background:none;color:white;display:flex;flex-direction:column;align-items:center;gap:7px;font:inherit;cursor:pointer}
+.icon{width:56px;height:56px;border-radius:18px;display:grid;place-items:center;font-size:26px;background:#ffffff20;border:1px solid #ffffff25;box-shadow:0 7px 20px #0002}
+.app small{font-size:11px;color:#eef2fb}
+.widget{margin-top:28px;background:#ffffff16;border:1px solid #ffffff22;padding:16px;border-radius:20px;color:#e8edff}
+.nav{height:44px;position:absolute;bottom:0;left:0;right:0;display:flex;justify-content:center;align-items:center;background:#090d16aa;backdrop-filter:blur(12px)}
+.homebar{width:108px;height:4px;border-radius:8px;background:#fff9}
+.pagehead{display:flex;align-items:center;gap:12px;margin:4px 0 20px}.back{border:0;border-radius:12px;padding:9px 13px;background:#ffffff18;color:white;font-size:18px}
+h2{font-size:23px;margin:0}.muted{color:var(--muted)}.card{background:var(--panel);border:1px solid var(--line);padding:15px;border-radius:16px;margin:12px 0}
+button.primary{background:var(--accent);color:#101522;border:0;border-radius:12px;padding:11px 15px;font-weight:650;cursor:pointer}
+button.secondary{background:#ffffff16;color:white;border:1px solid #ffffff20;border-radius:12px;padding:10px 13px;cursor:pointer}
+input,textarea,select{font:inherit}.field{width:100%;background:#0d1220;color:white;border:1px solid var(--line);border-radius:12px;padding:12px;margin:7px 0 12px}
+textarea{width:100%;min-height:210px;resize:vertical;background:#0a0e18;color:#dce7ff;border:1px solid var(--line);border-radius:12px;padding:12px;font:12px ui-monospace,monospace}
+iframe{width:100%;aspect-ratio:16/9;border:0;border-radius:14px;background:#000}
+a{color:#9db5ff}.row{display:flex;gap:8px;flex-wrap:wrap;align-items:center}.hidden{display:none!important}
+.video{display:grid;grid-template-columns:112px 1fr;gap:10px;padding:10px 0;border-bottom:1px solid var(--line);cursor:pointer}
+.video img{width:112px;aspect-ratio:16/9;object-fit:cover;border-radius:9px}.video b{font-size:13px;line-height:1.3}.video small{display:block;color:var(--muted);margin-top:5px}
+.statusmsg{font-size:13px;margin:8px 0;color:#c8d5ee}.ok{color:#8de0b1}.err{color:#ffaaaa}
+@media(min-width:500px){.phone{height:850px;margin:20px auto}}
+</style>
+</head>
+<body>
+<div class="phone">
+ <div class="status"><span id="statusTime">12:00</span><span>● ● ●　 Wi-Fi　▰</span></div>
+ <main id="screen"></main><div class="nav"><div class="homebar"></div></div>
+</div>
+<script>
+const screen=document.getElementById('screen');
+let activeVideoId='';
+function tick(){const d=new Date();document.getElementById('statusTime').textContent=d.toLocaleTimeString('ru-RU',{hour:'2-digit',minute:'2-digit'});}
+tick();setInterval(tick,30000);
+const getKey=()=>localStorage.getItem('wp-youtube-key')||'';
+function home(){
+ screen.innerHTML=`<div class="clock" id="clock"></div><div class="date" id="date"></div>
+ <input class="search" id="websearch" placeholder="Поиск в интернете или адрес сайта">
+ <div class="grid">
+ ${app('▶️','YouTube','youtube')}${app('🌐','Браузер','browser')}${app('⚙️','Настройки','settings')}${app('🧩','Редактор','editor')}
+ ${app('📝','Заметки','notes')}${app('❔','О телефоне','about')}
+ </div><div class="widget"><b>Добро пожаловать в WebPhone 0.2</b><p class="muted">YouTube API, поиск видео, встроенный плеер, настройки и редактор CSS.</p><p class="muted">${getKey()?'YouTube API: ключ сохранён на этом устройстве':'YouTube API: добавь ключ в настройках'}</p></div>`;
+ updateClock();
+ document.getElementById('websearch').addEventListener('keydown',e=>{if(e.key==='Enter')openAddress(e.target.value)});
+}
+function app(emoji,name,id){return `<button class="app" onclick="openApp('${id}')"><span class="icon">${emoji}</span><small>${name}</small></button>`}
+function updateClock(){const d=new Date();let c=document.getElementById('clock'),dt=document.getElementById('date');if(c)c.textContent=d.toLocaleTimeString('ru-RU',{hour:'2-digit',minute:'2-digit'});if(dt)dt.textContent=d.toLocaleDateString('ru-RU',{weekday:'long',day:'numeric',month:'long'});}
+setInterval(updateClock,10000);
+function head(title){return `<div class="pagehead"><button class="back" onclick="home()">‹</button><h2>${title}</h2></div>`}
+function openApp(id){({youtube, browser, settings, editor, notes, about}[id]||home)();}
+function youtube(){
+ screen.innerHTML=head('YouTube')+`
+ <form id="ytform" class="row"><input class="field" style="flex:1;min-width:0" id="ytq" placeholder="Что посмотреть?"><button class="primary">Найти</button></form>
+ <div id="ytstatus" class="statusmsg">${getKey()?'Готово к поиску.':'Сначала добавь API-ключ в Настройки → YouTube API.'}</div>
+ <div id="ytplayer" class="card hidden"></div><div id="ytresults" class="card"><span class="muted">Здесь появятся результаты поиска.</span></div>
+ <p class="muted">Поиск использует YouTube Data API v3. Воспроизведение доступно для видео, разрешающих встраивание.</p>
+ <button class="secondary" onclick="window.open('https://www.youtube.com','_blank','noopener')">Открыть YouTube ↗</button>`;
+ document.getElementById('ytform').onsubmit=async e=>{e.preventDefault();await searchYouTube(document.getElementById('ytq').value.trim());};
+}
+async function searchYouTube(q){
+ const key=getKey(),status=document.getElementById('ytstatus'),results=document.getElementById('ytresults');
+ if(!key){status.textContent='Нет API-ключа. Добавь его в Настройки → YouTube API.';status.className='statusmsg err';return;}
+ if(!q){status.textContent='Введи поисковый запрос.';return;}
+ status.textContent='Ищем видео…';status.className='statusmsg';
+ results.innerHTML='';
+ try{
+  const url='https://www.googleapis.com/youtube/v3/search?part=snippet&type=video&maxResults=10&q='+encodeURIComponent(q)+'&key='+encodeURIComponent(key);
+  const r=await fetch(url);const data=await r.json();
+  if(!r.ok)throw new Error(data.error?.message||'Ошибка YouTube API ('+r.status+')');
+  const items=data.items||[];
+  if(!items.length){results.innerHTML='<p class="muted">Ничего не найдено.</p>';status.textContent='Поиск завершён.';return;}
+  results.innerHTML=items.map(v=>{const id=v.id?.videoId,s=v.snippet||{};return `<div class="video" role="button" tabindex="0" onclick="playVideo('${safeAttr(id)}')" onkeydown="if(event.key==='Enter')playVideo('${safeAttr(id)}')"><img src="${safeAttr(s.thumbnails?.medium?.url||s.thumbnails?.default?.url||'')}" alt=""><div><b>${escapeHTML(s.title||'Видео')}</b><small>${escapeHTML(s.channelTitle||'')}</small><small>${escapeHTML((s.description||'').slice(0,90))}</small></div></div>`}).join('');
+  status.textContent='Найдено: '+items.length+' видео.';
+ }catch(e){status.textContent='Не удалось выполнить поиск: '+e.message;status.className='statusmsg err';results.innerHTML='<p class="muted">Проверь ключ, ограничения ключа, квоту API и доступ к Google API.</p>';}
+}
+function playVideo(id){
+ if(!id)return;activeVideoId=id;const p=document.getElementById('ytplayer');p.classList.remove('hidden');
+ p.innerHTML=`<iframe src="https://www.youtube-nocookie.com/embed/${encodeURIComponent(id)}" title="YouTube video player" allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share" referrerpolicy="strict-origin-when-cross-origin" allowfullscreen></iframe><p><a target="_blank" rel="noopener" href="https://www.youtube.com/watch?v=${encodeURIComponent(id)}">Открыть на YouTube ↗</a></p>`;
+ p.scrollIntoView({behavior:'smooth',block:'start'});
+}
+function openAddress(v){let u=v.trim();if(!u)return;if(!/^https?:\/\//i.test(u)){if(u.includes('.')&&!u.includes(' '))u='https://'+u;else u='https://www.google.com/search?q='+encodeURIComponent(u)}window.open(u,'_blank','noopener');}
+function browser(){screen.innerHTML=head('Браузер')+`<div class="card"><p>Открывай сайты в новой вкладке браузера устройства.</p><input class="field" id="url" placeholder="https://example.com"><button class="primary" onclick="openAddress(document.getElementById('url').value)">Перейти ↗</button></div><div class="card"><a target="_blank" rel="noopener" href="https://www.google.com">Google</a><br><a target="_blank" rel="noopener" href="https://www.youtube.com">YouTube</a></div>`;}
+function settings(){
+ const key=getKey();
+ screen.innerHTML=head('Настройки')+`
+ <div class="card"><h3 style="margin-top:0">YouTube API</h3><p class="muted">Вставь свой ключ YouTube Data API v3. Он будет сохранён локально в браузере этого устройства.</p>
+ <label for="ytkey">API-ключ</label><input class="field" id="ytkey" type="password" autocomplete="off" placeholder="Вставь API-ключ" value="${safeAttr(key)}">
+ <div class="row"><button class="primary" onclick="saveApiKey()">Сохранить</button><button class="secondary" onclick="toggleKey()">Показать</button><button class="secondary" onclick="testApiKey()">Проверить</button></div>
+ <div id="keymsg" class="statusmsg"></div>
+ <button class="secondary" style="margin-top:8px" onclick="deleteApiKey()">Удалить ключ</button>
+ <p class="muted">Совет: в Google Cloud ограничь ключ только YouTube Data API v3 и, если доступно, HTTP referrer своего сайта. Не используй этот ключ для других Google API.</p></div>
+ <div class="card"><b>Цвет интерфейса</b><input class="field" id="accent" type="color" value="${getComputedStyle(document.documentElement).getPropertyValue('--accent').trim()}" style="height:48px;padding:5px"><button class="primary" onclick="saveAccent()">Применить</button></div>
+ <div class="card"><b>Обои</b><select class="field" id="wall"><option value="blue">Сине-фиолетовые</option><option value="dark">Тёмные</option><option value="sunset">Закат</option></select><button class="primary" onclick="saveWall()">Применить</button></div>
+ <div class="card"><b>Хранилище</b><p class="muted">Ключ, тема и заметки сохраняются в этом браузере. Очистка данных сайта удалит их.</p><button class="secondary" onclick="if(confirm('Сбросить настройки интерфейса?')){localStorage.removeItem('wp-theme');localStorage.removeItem('wp-wall');home()}">Сбросить настройки интерфейса</button></div>`;
+}
+function saveApiKey(){const k=document.getElementById('ytkey').value.trim();if(!k){showKeyMsg('Вставь ключ перед сохранением.','err');return;}localStorage.setItem('wp-youtube-key',k);showKeyMsg('Ключ сохранён на этом устройстве.','ok');}
+function deleteApiKey(){localStorage.removeItem('wp-youtube-key');document.getElementById('ytkey').value='';showKeyMsg('Ключ удалён с этого устройства.','ok');}
+function toggleKey(){const i=document.getElementById('ytkey');i.type=i.type==='password'?'text':'password';}
+function showKeyMsg(t,c=''){const m=document.getElementById('keymsg');if(m){m.textContent=t;m.className='statusmsg '+c;}}
+async function testApiKey(){
+ const k=document.getElementById('ytkey').value.trim();if(!k){showKeyMsg('Сначала введи ключ.','err');return;}
+ showKeyMsg('Проверяем ключ…');
+ try{const u='https://www.googleapis.com/youtube/v3/videos?part=id&id=dQw4w9WgXcQ&key='+encodeURIComponent(k);const r=await fetch(u);const d=await r.json();if(!r.ok)throw new Error(d.error?.message||'HTTP '+r.status);showKeyMsg('Ключ работает: YouTube Data API отвечает.','ok');}
+ catch(e){showKeyMsg('Проверка не прошла: '+e.message,'err');}
+}
+function saveAccent(){let c=document.getElementById('accent').value;document.documentElement.style.setProperty('--accent',c);localStorage.setItem('wp-accent',c);}
+function saveWall(){let w=document.getElementById('wall').value;localStorage.setItem('wp-wall',w);applyWall(w);}
+function applyWall(w){let b=document.querySelector('.phone');if(!b)return;b.style.background=w==='dark'?'linear-gradient(160deg,#252525,#080808)':w==='sunset'?'linear-gradient(160deg,#8c4561,#28234c 65%,#17182b)':'linear-gradient(160deg,#202b45,#101522 55%,#18243a)';}
+function editor(){let starter=localStorage.getItem('wp-custom-css')||`/* Измени CSS и нажми «Применить». */\n.phone { border-radius: 36px; }\n.icon { border-radius: 22px; }\n/* Это меняет внешний вид текущего WebPhone в этом браузере. */`;
+screen.innerHTML=head('Редактор кода')+`<div class="card"><b>CSS редактор</b><p class="muted">Меняй стили телефона. Код сохранится в этом браузере.</p><textarea id="code" spellcheck="false"></textarea><div class="row"><button class="primary" onclick="applyCode()">Применить</button><button class="secondary" onclick="downloadCode()">Экспорт CSS</button><button class="secondary" onclick="resetCode()">Сбросить</button></div></div><div class="card"><b>Обновление сайта</b><p class="muted">Локальный редактор меняет стили только в этом браузере. Чтобы обновить опубликованный сайт для всех устройств, нужно изменить index.html в репозитории и заново опубликовать проект.</p></div>`;
+document.getElementById('code').value=starter;}
+function applyCode(){let css=document.getElementById('code').value;let old=document.getElementById('custom-style');if(old)old.remove();let s=document.createElement('style');s.id='custom-style';s.textContent=css;document.head.appendChild(s);localStorage.setItem('wp-custom-css',css);alert('CSS применён и сохранён на этом устройстве.');}
+function downloadCode(){let blob=new Blob([document.getElementById('code').value],{type:'text/css'});let a=document.createElement('a');a.href=URL.createObjectURL(blob);a.download='webphone-custom.css';a.click();URL.revokeObjectURL(a.href)}
+function resetCode(){localStorage.removeItem('wp-custom-css');editor();}
+function notes(){screen.innerHTML=head('Заметки')+`<textarea id="note" placeholder="Твои заметки..."></textarea><button class="primary" onclick="localStorage.setItem('wp-note',document.getElementById('note').value);alert('Сохранено')">Сохранить</button>`;document.getElementById('note').value=localStorage.getItem('wp-note')||'';}
+function about(){screen.innerHTML=head('О телефоне')+`<div class="card"><h2>WebPhone OS</h2><p>Версия 0.2</p><p class="muted">YouTube Data API v3, встроенный YouTube-плеер, настройки, заметки и CSS-редактор.</p></div>`;}
+function escapeHTML(s){return String(s).replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));}
+function safeAttr(s){return escapeHTML(s||'');}
+function loadPrefs(){
+ const accent=localStorage.getItem('wp-accent');if(accent)document.documentElement.style.setProperty('--accent',accent);
+ const css=localStorage.getItem('wp-custom-css');if(css){const st=document.createElement('style');st.id='custom-style';st.textContent=css;document.head.appendChild(st);}
+}
+loadPrefs();home();applyWall(localStorage.getItem('wp-wall')||'blue');
+</script>
+</body>
+</html>
